@@ -1,0 +1,33 @@
+# Byte-compiled / optimized / logs / cache
+__pycache__/
+*.py[cod]
+*.so
+*.log
+
+# Virtual environments
+venv/
+env/
+.venv/
+ENV/
+
+# Data
+data/*.csv
+
+# IDEs
+.idea/
+.vscode/
+
+# System
+.DS_Store
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Output (optional)
+output/
+results/
+
+# Secrets (if any)
+.env
