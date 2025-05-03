@@ -1,68 +1,75 @@
-# preprocess.py
-# -------------------------------------------------
-# Prepares raw or synthetic logistics data for VAE-GAN training
-# Tasks: one-hot encode categorical vars, normalize numerics, export ML-ready CSV
-
 import pandas as pd
 import numpy as np
 import os
-from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
 import logging
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Input/output paths
-INPUT_PATH = "data/synthetic/logistics_data_baseline_1746275160.csv"
-OUTPUT_PATH = "data/processed/logistics_data_processed.csv"
 
-# Columns to use in model
-NUMERIC_FEATURES = ['volume', 'distance_km', 'transit_time', 'cost', 'co2_emissions', 'urgency', 'satisfaction']
-CATEGORICAL_FEATURES = ['mode']
-DROP_COLUMNS = ['shipment_id', 'origin_city', 'destination_city']  # If present
+# Define preprocessing function
+def preprocess_logistics_data(input_filepath, output_dir="data/processed"):
+    # Ensure output directory exists
+    os.makedirs(output_dir, exist_ok=True)
 
-# Main preprocessing function
-def preprocess_data(input_path, output_path):
-    if not os.path.exists(input_path):
-        logging.error(f"File not found: {input_path}")
-        return
+    # Load the dataset
+    logging.info(f"Loading dataset from {input_filepath}")
+    df = pd.read_csv(input_filepath)
+    logging.info(f"Dataset loaded with shape {df.shape}")
 
-    df = pd.read_csv(input_path)
-    logging.info(f"Loaded dataset with shape: {df.shape}")
+    # Define column types
+    categorical_cols = [
+        'day_of_week', 'transport_mode', 'weather_condition',
+        'port_status', 'road_incident'
+    ]
+    numerical_cols = [
+        'time_step', 'hour_of_day', 'demand_level', 'volume', 'weight',
+        'distance', 'transit_time', 'fuel_price', 'co2_emissions',
+        'fuel_cost', 'emission_penalty', 'weather_severity',
+        'traffic_congestion', 'driver_fatigue', 'port_congestion',
+        'shipment_urgency', 'customer_satisfaction', 'delivery_deadline'
+    ]
+    # Columns to drop (not useful for training or already encoded elsewhere)
+    drop_cols = ['shipment_id', 'origin', 'destination', 'route']
 
-    # Drop unnecessary columns if present
-    for col in DROP_COLUMNS:
-        if col in df.columns:
-            df.drop(columns=col, inplace=True)
+    # 1. Drop unnecessary columns
+    logging.info("Dropping unnecessary columns")
+    df = df.drop(columns=drop_cols)
 
-    # Define transformers
+    # 2. Encode categorical variables (one-hot encoding)
+    logging.info("Encoding categorical variables")
+    df_encoded = pd.get_dummies(df, columns=categorical_cols, dtype=float)
+
+    # 3. Normalize numerical columns to [0, 1]
+    logging.info("Normalizing numerical columns")
     scaler = MinMaxScaler()
-    encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
+    df_encoded[numerical_cols] = scaler.fit_transform(df_encoded[numerical_cols])
 
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ('num', scaler, NUMERIC_FEATURES),
-            ('cat', encoder, CATEGORICAL_FEATURES)
-        ]
+    # 4. Convert to NumPy array
+    logging.info("Converting to NumPy array")
+    data_array = df_encoded.to_numpy()
+    logging.info(f"Final preprocessed data shape: {data_array.shape}")
+
+    # 5. Split into training and validation sets (80-20 split)
+    logging.info("Splitting into training and validation sets")
+    train_data, val_data = train_test_split(
+        data_array, test_size=0.2, random_state=42, stratify=df['transport_mode']
     )
+    logging.info(f"Training set shape: {train_data.shape}")
+    logging.info(f"Validation set shape: {val_data.shape}")
 
-    pipeline = Pipeline(steps=[('preprocessor', preprocessor)])
-    processed_array = pipeline.fit_transform(df)
+    # 6. Save preprocessed data
+    timestamp = int(os.path.basename(input_filepath).split('_')[-1].split('.')[0])
+    train_path = os.path.join(output_dir, f"train_data_{timestamp}.npy")
+    val_path = os.path.join(output_dir, f"val_data_{timestamp}.npy")
+    np.save(train_path, train_data)
+    np.save(val_path, val_data)
+    logging.info(f"Saved training data to {train_path}")
+    logging.info(f"Saved validation data to {val_path}")
 
-    # Create feature names
-    cat_feature_names = list(pipeline.named_steps['preprocessor'].named_transformers_['cat'].get_feature_names_out(CATEGORICAL_FEATURES))
-    feature_names = NUMERIC_FEATURES + cat_feature_names
-
-    processed_df = pd.DataFrame(processed_array, columns=feature_names)
-    logging.info(f"Preprocessed dataset shape: {processed_df.shape}")
-
-    # Save output
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    processed_df.to_csv(output_path, index=False)
-    logging.info(f"Saved preprocessed data to: {output_path}")
 
 # Example usage
 if __name__ == "__main__":
-    preprocess_data(INPUT_PATH, OUTPUT_PATH)
+    preprocess_logistics_data("data/synthetic/logistics_data_baseline_1746285358.csv")

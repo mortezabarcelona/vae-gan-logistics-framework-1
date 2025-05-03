@@ -1,8 +1,3 @@
-# data_validation_pipeline.py
-# ------------------------------------------
-# Post-generation validation module for synthetic logistics data
-# Checks include: missing values, duplicates, mode balance, logical consistency, and outliers
-
 import pandas as pd
 import logging
 import os
@@ -34,15 +29,15 @@ def validate_logistics_data(filepath):
         logging.info("✅ No duplicated rows.")
 
     # 3. Validate transport mode distribution
-    if 'mode' in df.columns:
-        mode_distribution = df['mode'].value_counts(normalize=True)
+    if 'transport_mode' in df.columns:
+        mode_distribution = df['transport_mode'].value_counts(normalize=True)
         logging.info("Transport mode distribution:")
         logging.info(f"\n{mode_distribution}")
     else:
-        logging.warning("Column 'mode' not found. Skipping mode distribution check.")
+        logging.warning("Column 'transport_mode' not found. Skipping mode distribution check.")
 
     # 4. Check for negative or extreme values
-    for col in ['transit_time', 'cost', 'co2_emissions']:
+    for col in ['transit_time', 'fuel_cost', 'co2_emissions']:
         if col in df.columns:
             negatives = df[df[col] < 0]
             if not negatives.empty:
@@ -54,7 +49,7 @@ def validate_logistics_data(filepath):
             logging.warning(f"Column '{col}' not found in dataset.")
 
     # 5. Check urgency and satisfaction range
-    for col in ['urgency', 'satisfaction']:
+    for col in ['shipment_urgency', 'customer_satisfaction']:
         if col in df.columns:
             if not df[col].between(0, 1).all():
                 logging.warning(f"Values outside [0,1] found in {col}.")
@@ -65,4 +60,4 @@ def validate_logistics_data(filepath):
 
 # Example usage:
 if __name__ == "__main__":
-    validate_logistics_data("data/synthetic/logistics_data_baseline_1746275160.csv")
+    validate_logistics_data("data/synthetic/logistics_data_baseline_1746285358.csv")
